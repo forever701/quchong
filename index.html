@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Login Page</title>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.0.0/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .login-container {
+            width: 400px;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+
+        .login-container h2 {
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: bold;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            box-sizing: border-box;
+        }
+
+        .form-group button[type="submit"] {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            background-color: #4CAF50;
+            /* Green */
+            color: white;
+            cursor: pointer;
+
+        }
+
+        div {
+            box-sizing: border-box;
+        }
+
+        input {
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app" class="login-container">
+        <h2>登录</h2>
+
+        <form id="login-form" submit="return false">
+            <div class="form-group">
+                <label for="username">用户名:</label>
+                <input type="text" id="username" placeholder="输入用户名" autocomplete="username" v-model="username" />
+            </div>
+
+
+            <div class="form-group">
+                <label for="password">密码:</label>
+                <input type="password" id="password" placeholder="输入密码" autocomplete="current-password"
+                    v-model="password" />
+            </div>
+
+            <button @click="login">登录</button>
+
+        </form>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                username: '',
+                password: '',
+                baseUrl: 'http://127.0.0.1:3001',
+            },
+            methods: {
+                login(e) {
+                    e.preventDefault();
+                    const url = `${this.baseUrl}/api/login`;
+                    const data = {
+                        'username': this.username,
+                        'password': CryptoJS.MD5(this.password).toString()
+                    }
+                    axios.post(url, data).then((res) => {
+                        if (res.data.code === 1) {
+                            window.location.href = "/home.html";
+                            window.localStorage.setItem("username", this.username)
+                        } else {
+                            alert(res.data.msg);
+                        }
+                    });
+                }
+            }
+        });
+    </script>
+
+</body>
+
+</html>

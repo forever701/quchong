@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>File Upload</title>
+    <link rel="stylesheet" href="https://unpkg.com/vant@2.12/lib/index.css" />
+    <script src="https://unpkg.com/vue@2.6/dist/vue.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://unpkg.com/vant@2.12/lib/vant.min.js"></script>
+    <style>
+        th,
+        td {
+            min-height: 20px;
+            line-height: 20px;
+            font-size: 14px;
+            border-width: 1px;
+            border-style: solid;
+            border-color: red;
+            padding: 5px;
+            position: relative;
+            text-align: left;
+            font-weight: 400;
+            color: #666;
+            /*min-width: 180px;*/
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <van-popup v-model="show" :close-on-click-overlay="false">
+            <van-loading size="24px" vertical style="padding: 80px 40px;">筛选中...</van-loading>
+        </van-popup>
+        <!-- 创建一个 input 元素来选择和上传文件 -->
+        <input type="file" id="fileInput" @change="handleFileSelect">
+
+        <!-- 显示去重按钮 -->
+        <button id="deduplicateButton" style="display: none;">去重</button>
+        <table
+            style="border-collapse:collapse;color: #666;border-spacing: 0;width: 100%;margin-top: 10px;max-width: 750px;"
+            v-for="(listItem,listIndex) in list">
+            <thead>
+                <tr>
+                    <th style="font-weight: 800;text-align: center;" colspan="2">{{listItem.day}}</th>
+                    <!-- <th></th> -->
+                </tr>
+            </thead>
+            <tbody v-for="(item, index) in listItem.file_name" :key="index">
+                <!-- 将具体数据绑定到对应列 -->
+                <tr>
+                    <td>{{ item }}</td>
+                    <td>
+                        <button @click="downloadTxt(listItem.day,index,item)">下载</button>
+                        <button @click="deletePhones(listItem.day,index,item)"
+                            style="background: red;color: #fff;">删除</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+
+    <!-- 引入 Vue 和你的自定义脚本 -->
+
+    <script src="./time.js"></script>
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    show: false,
+                    list: [],
+                    baseUrl: 'http://127.0.0.1:3001'
+                }
+            },
+            mounted() {
+                if(!window.localStorage.getItem("username")){
+                    window.location.href = '/'
+                }
+                this.getDowloadList();
+            },
+            methods: {
+                getDowloadList() {
+                    const time = getTime();
+                    const url = `${this.baseUrl}/api/getfiles?f=${time - 6}&l=${time}`
+                    axios.get(url).then((res) => {
+                        this.list = res.data.list;
+                        for (let i in this.list) {
+                            this.list[i].file_name = JSON.parse(this.list[i].file_name);
+                        }
+
+                    });
+                },
+                downloadTxt(day, count, name) {
+                    const type = String(day) + count;
+                    const url = `${this.baseUrl}/api/download?t=${type}`
+                    axios.get(url).then((res) => {
+                        this.download(res.data.list, name);
+                    });
+                },
+                deletePhones(day, count, name) {
+                    const url = `${this.baseUrl}/api/delete`;
+                    const data = {
+                        'day': day,
+                        'count': count,
+                        'filename': name
+                    }
+                    axios.post(url, data).then((res) => {
+                        location.reload();
+                    });
+                },
+                download(data, name) {
+                    const textContent = data.join('\n');
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(textContent);
+                    downloadLink.download = name;
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                    location.reload();
+                },
+                handleFileSelect() {
+                    // 获取所选文件对象
+                    const selectedFile = event.target.files[0];
+                    if (selectedFile.name.indexOf('.txt') == -1) {
+                        alert('文件上传错误，需为txt文件');
+                        location.reload();
+                        return;
+                    }
+                    const _this = this;
+                    // 使用 FileReader 对象读取文本内容
+                    const reader = new FileReader();
+                    reader.onloadend = function (e) {
+                        // 将文本内容传递给 Node.js API 进行处理
+                        const textContent = reader.result;
+                        const linesArray = textContent.split('\n'); // 将内容按行分割成字符串数组
+                        // 去除空白行和重复项
+                        const numbersArray = [...new Set(linesArray.filter(line => line.trim() !== ''))];
+
+                        // 去除每个元素中的所有空格
+                        const trimmedNumbersArray = numbersArray.map(number => number.replace(/\s/g, ''));
+                        // deduplicateButton.style.display = 'block'; // 显示去重按钮
+                        // deduplicateButton.addEventListener('click', () => {
+                        _this.show = true;
+                        // 调用 Node.js API 接口进行去重操作
+                        fetch(`${_this.baseUrl}/api/quchong`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ content: JSON.stringify(trimmedNumbersArray), filename: selectedFile.name })
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                // 拿到的数据下载成txt,并刷新当前网页
+                                if (data.data) {
+                                    // _this.download(data.data, selectedFile.name);
+                                    location.reload();
+                                } else {
+                                    if (data.msg) {
+                                        alert(data.msg);
+                                    } else {
+                                        alert('当前文件号码都存在');
+                                    }
+
+                                    location.reload();
+                                }
+                                _this.show = false;
+                            })
+                            .catch(error => {
+                                _this.show = false;
+                                console.error(error)
+                            });
+                        // });
+                    };
+
+                    // 读取文件内容
+                    if (selectedFile) {
+                        reader.readAsText(selectedFile);
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
